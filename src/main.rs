@@ -23,10 +23,10 @@ mod server_tcp;
 mod messages;
 mod packet;
 
-use std::env;
+
 use clap::{App, Arg};
 use std::time::Duration;
-use crate::test_parameters::TestParameters;
+
 use crate::client::client::Client;
 use thread_priority::{set_current_thread_priority, ThreadPriority};
 use affinity::get_core_num;
@@ -34,7 +34,7 @@ use affinity::get_core_num;
 #[tokio::main]
 async fn main() {
 
-    use server_udp::server::start;
+    
 
     let matches = App::new("Rperf")
         .version("1.0.0")
@@ -122,7 +122,7 @@ async fn main() {
         )
         .get_matches();
 
-    let cores: Vec<usize> = (0..get_core_num()).collect();
+    let _cores: Vec<usize> = (0..get_core_num()).collect();
     println!("Core nums : {}", get_core_num());
     assert!(set_current_thread_priority(ThreadPriority::Max).is_ok());
 
@@ -157,8 +157,8 @@ async fn main() {
         let size = matches.value_of_t("size").unwrap();
         let log_path = matches.value_of("log").unwrap_or_default();
 
-        let mut output_rtt = matches.is_present("rtt");
-        let mut measure_owl = matches.is_present("owl");
+        let output_rtt = matches.is_present("rtt");
+        let measure_owl = matches.is_present("owl");
 
         if let Some(ip) = matches.value_of("ip") {
             println!("IP: {}", ip);

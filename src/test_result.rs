@@ -18,7 +18,7 @@ use std::collections::{LinkedList, HashMap};
 use crate::packet_result::PacketResult;
 use crate::test_parameters::TestParameters;
 use crate::packet::{SentPacket, ReceivedPacket};
-use std::time::Duration;
+
 use std::ops::Sub;
 
 #[derive(Clone)]
@@ -73,9 +73,9 @@ impl TestResult {
                     }
                 }
                 else {
-                    let roundTripTime = received_time.sub(sent_packet.sent_duration);
-                    let roundTripTimeInMillis = (roundTripTime.as_secs() as f64 + roundTripTime.subsec_nanos() as f64 * 1e-9) * 1000_f64;
-                    latency_ms = roundTripTimeInMillis;
+                    let round_trip_time = received_time.sub(sent_packet.sent_duration);
+                    let round_trip_time_ms = (round_trip_time.as_secs() as f64 + round_trip_time.subsec_nanos() as f64 * 1e-9) * 1000_f64;
+                    latency_ms = round_trip_time_ms;
                 }
 
                 if !output_rtt

@@ -16,8 +16,8 @@
 
 pub mod server {
     use std::net::UdpSocket;
-    use std::{io, str};
-    use thread_priority::*;
+    
+    
     use std::time::{SystemTime, UNIX_EPOCH};
 
     pub fn start(port: u16) -> std::io::Result<()> {
@@ -34,7 +34,7 @@ pub mod server {
         // Wait for packets
         loop {
             let mut buf = [0u8; 1500];
-            let (amt, src) = socket.recv_from(&mut buf)?;
+            let (_amt, src) = socket.recv_from(&mut buf)?;
 
             let mut payload = vec![1u8; 16];
             payload[0..=7].copy_from_slice(&buf[0..=7]);

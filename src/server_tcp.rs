@@ -16,9 +16,8 @@
 
 pub mod server {
     use std::{thread, time, io};
-    use std::net::{ Shutdown};
-    use std::io::{Read, Write};
-    use tokio::net::{TcpListener, TcpStream};
+
+    use tokio::net::{TcpListener};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use crate::messages::InitMessage;
     use std::str::from_utf8;
@@ -31,8 +30,8 @@ pub mod server {
         // core_affinity::set_for_current(core_ids[0]);
         assert!(set_current_thread_priority(ThreadPriority::Max).is_ok());
         // Open TCP socket
-        let serverAddress = format!("{}:{}", "0.0.0.0", port);
-        let listener = TcpListener::bind(serverAddress).await?;
+        let server_address = format!("{}:{}", "0.0.0.0", port);
+        let listener = TcpListener::bind(server_address).await?;
         println!("Started TCP server on port '{}'", port);
 
         loop {
@@ -40,11 +39,11 @@ pub mod server {
 
             tokio::spawn(async move {
                 // Configure stream
-                socket.set_nodelay(true);
+                socket.set_nodelay(true).unwrap();
 
                 // Wait for init message from client
                 let mut buf_init = [0; 1500];
-                let mut client_init_message: InitMessage;
+                let client_init_message: InitMessage;
                 loop {
                     let n = match socket.read(&mut buf_init).await {
                         Ok(n) if n == 0 => return,
@@ -69,13 +68,13 @@ pub mod server {
                 }
                 println!("Client '{}' connected and wants to perform test with packet size '{} byte'", socket.peer_addr().unwrap(), client_init_message.packet_size);
                 thread::sleep(time::Duration::from_millis(100));
-                socket.write("OK".as_bytes()).await;
-                socket.flush().await;
+                socket.write("OK".as_bytes()).await.unwrap();
+                socket.flush().await.unwrap();
 
                 let mut buf = vec![0; client_init_message.packet_size];
                 loop {
                     // Wait for packets and ...
-                    let n = match socket.read_exact(&mut buf).await {
+                    let _n = match socket.read_exact(&mut buf).await {
                         // socket closed
                         Ok(n) if n == 0 => return,
                         Ok(n) => n,
