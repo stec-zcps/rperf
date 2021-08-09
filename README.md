@@ -1,4 +1,15 @@
 # Introduction
+Rperf is a network latency measurement tool written in Rust. It aims to analyze the network latency of packets with 
+different test parameters (e.g. network protocol, packet size, packet rate). The following features and parameters are 
+currently supported:
+* Measure round trip time of packets via ping pong between client and server
+* Measure one way latencies of packets between client and server using system timestamps 
+  (system clocks of client and server need to be synchronized!)
+* UDP or TCP for packet transmission between client and server
+* Configurable packet rate per second
+* Configurable payload size of packets (min. 16 bytes)
+* Create symmetric or asymmetric network load by using minimal pong packets or packet mirroring
+* Output test results CSV file
 
 # Build
 ## Executable
