@@ -20,7 +20,7 @@ pub mod server {
 
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    pub fn start(port: u16) -> std::io::Result<()> {
+    pub fn start(port: u16, symmetric_network_load: bool) -> std::io::Result<()> {
         // Configure thread
         //let core_ids = core_affinity::get_core_ids().unwrap();
         //core_affinity::set_for_current(core_ids[0]);
@@ -36,7 +36,15 @@ pub mod server {
             let mut buf = [0u8; 1500];
             let (_amt, src) = socket.recv_from(&mut buf)?;
 
-            let mut payload = vec![1u8; 16];
+            let mut payload: Vec<u8>;
+            if symmetric_network_load && _amt >= 16
+            {
+                payload = vec![1u8; _amt];
+            }
+            else {
+                payload = vec![1u8; 16];
+            }
+
             payload[0..=7].copy_from_slice(&buf[0..=7]);
             let current_system_time_unix_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
             let current_system_time_unix_epoch_ms = current_system_time_unix_epoch.as_secs() as f64

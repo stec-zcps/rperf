@@ -24,7 +24,7 @@ pub mod server {
     use thread_priority::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    pub async fn start(port: u16) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn start(port: u16, symmetric_network_load: bool) -> Result<(), Box<dyn std::error::Error>> {
         // Configure thread
         // let core_ids = core_affinity::get_core_ids().unwrap();
         // core_affinity::set_for_current(core_ids[0]);
@@ -89,7 +89,14 @@ pub mod server {
                     };
 
                     // ... send new packet with index of received packet back
-                    let mut payload = vec![1u8; 16];
+                    let mut payload: Vec<u8>;
+                    if symmetric_network_load
+                    {
+                        payload = vec![1u8; client_init_message.packet_size];
+                    }
+                    else {
+                        payload = vec![1u8; 16];
+                    }
                     payload[0..=7].copy_from_slice(&buf[0..=7]);
                     let current_system_time_unix_epoch = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
                     let current_system_time_unix_epoch_ms = current_system_time_unix_epoch.as_secs() as f64

@@ -30,11 +30,10 @@ use std::time::Duration;
 use crate::client::client::Client;
 use thread_priority::{set_current_thread_priority, ThreadPriority};
 use affinity::get_core_num;
+use std::process;
 
 #[tokio::main]
 async fn main() {
-
-
 
     let matches = App::new("Rperf")
         .version("1.0.0")
@@ -57,6 +56,12 @@ async fn main() {
                 .about("Protocol of the server [tpc|udp]")
                 .required(true)
                 .takes_value(true))
+            .arg(Arg::new("sym-load")
+                .long("sym-load")
+                .value_name("sym-load")
+                .about("Creates symmetric network load between client and server using ping packet size for pong packets. If this flag is not set pong packets have minimal packet size (16 bytes).")
+                .required(false)
+                .takes_value(false))
         )
         .subcommand(App::new("client")
             .about("Execute latency test as client against a Rperf server")
@@ -131,15 +136,16 @@ async fn main() {
 
         let protocol = matches.value_of("protocol").unwrap();
         let port = matches.value_of_t("port").unwrap();
+        let symmetric_network_load = matches.is_present("sym-load");
 
         match protocol {
             "udp" => {
-                server_udp::server::start(port).unwrap_or_else(|error| {
+                server_udp::server::start(port, symmetric_network_load).unwrap_or_else(|error| {
                     panic!("Problem running test: {:?}", error);
                 });
             },
             "tcp" => {
-                server_tcp::server::start(port).await.unwrap_or_else(|error| {
+                server_tcp::server::start(port, symmetric_network_load).await.unwrap_or_else(|error| {
                     panic!("Problem running test: {:?}", error);
                 });
             },
@@ -162,6 +168,12 @@ async fn main() {
 
         if let Some(ip) = matches.value_of("ip") {
             println!("IP: {}", ip);
+        }
+
+        if size < 16
+        {
+            eprintln!("Packet size must be at least 16 bytes!");
+            process::exit(1);
         }
 
         let mut client = Client::new(ip, port, protocol, Duration::from_secs(time), mps, size, log_path, output_rtt, measure_owl);
