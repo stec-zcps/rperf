@@ -1,0 +1,7 @@
+language: rust
+rust:
+  - stable
+
+script:
+  - cargo build --verbose --workspace
+  - docker build -t stecipa/rperf:1.0.0-SNAPSHOT .
