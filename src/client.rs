@@ -345,15 +345,21 @@ pub mod client {
         fn generate_result(&mut self) -> std::io::Result<()> {
             let test_result = TestResult::from_tx_rx_times(self.test_parameters.clone(), &self.sent_packets, &self.received_packets, self.test_parameters.output_rtt);
 
-            println!("Sent Duration [ms]: {:.3}", test_result.sent_duration_millis);
+            println!("Sent Duration: {:.3} ms", test_result.sent_duration_millis);
             println!("Sent Packets: {}", test_result.sent_packets_count);
             println!("Received Packets: {}", test_result.received_packets_count);
             println!("Lost Packets: {}", test_result.lost_packets_count);
             if self.test_parameters.output_rtt
             {
-                println!("Average Round Trip Time: {}", test_result.average_latency());
+                println!("Average Round Trip Time: {} ms", test_result.average_latency());
             } else {
-                println!("Average Latency: {}", test_result.average_latency());
+                println!("Average Latency: {} ms", test_result.average_latency());
+            }
+
+            if self.test_parameters.measure_owl
+            {
+                println!("Average Latency Client -> Server: {} ms", test_result.average_latency_client_to_server());
+                println!("Average Latency Server -> Client: {} ms", test_result.average_latency_server_to_client());
             }
 
             if !&self.log_path.is_empty() {

@@ -46,13 +46,12 @@ impl TestResult {
             receive_packets_map.insert(received_packet.index, received_packet);
         }
 
+        let mut invalid_packets_due_timestamps = 0;
         for sent_packet in sent_packets {
             if receive_packets_map.contains_key(&sent_packet.index)
             {
                 let received_packet = *receive_packets_map.get(&sent_packet.index).unwrap();
                 let received_time = received_packet.received_duration;
-
-
 
                 let mut latency_ms: f64 = -1_f64;
                 let mut one_way_latency_client_to_server_ms: f64 = -1_f64;
@@ -67,9 +66,19 @@ impl TestResult {
                         latency_ms = one_way_latency_client_to_server_ms + one_way_latency_server_to_client_ms;
                     }
                     else {
-                        println!("Client Sent Timestamp: {}", (sent_packet.sent_timestamp.as_secs() as f64 + sent_packet.sent_timestamp.subsec_nanos() as f64 * 1e-9) * 1000_f64);
-                        println!("Server Timestamp: {}", (received_packet.server_timestamp.as_secs() as f64 + received_packet.server_timestamp.subsec_nanos() as f64 * 1e-9) * 1000_f64);
-                        println!("Client Receive Timestamp: {}", (received_packet.received_timestamp.as_secs() as f64 + received_packet.received_timestamp.subsec_nanos() as f64 * 1e-9) * 1000_f64);
+                        if one_way_latency_client_to_server.is_none()
+                        {
+                            let wrong_one_way_latency_client_to_server = sent_packet.sent_timestamp.checked_sub(received_packet.server_timestamp);
+                            let timestamps_difference = (wrong_one_way_latency_client_to_server.unwrap().as_secs() as f64 + wrong_one_way_latency_client_to_server.unwrap().subsec_nanos() as f64 * 1e-9) * 1000_f64;
+                            eprintln!("Timestamps of packet '{}' not plausible, server receive timestamp is before client sent timestamp (Difference: -{})", received_packet.index, timestamps_difference);
+                        }
+                        if one_way_latency_server_to_client.is_none()
+                        {
+                            let wrong_one_way_latency_server_to_client = received_packet.server_timestamp.checked_sub(received_packet.received_timestamp);
+                            let timestamps_difference = (wrong_one_way_latency_server_to_client.unwrap().as_secs() as f64 + wrong_one_way_latency_server_to_client.unwrap().subsec_nanos() as f64 * 1e-9) * 1000_f64;
+                            eprintln!("Timestamps of packet '{}' not plausible, client receive timestamp is before server receive timestamp (Difference: -{})", received_packet.index, timestamps_difference);
+                        }
+                        invalid_packets_due_timestamps += 1;
                     }
                 }
                 else {
@@ -104,6 +113,11 @@ impl TestResult {
 
         let sent_duration = packet_results.back().unwrap().tx_time.sub(packet_results.front().unwrap().tx_time);
 
+        if test_parameters.measure_owl
+        {
+            println!("Invalid packet count due timestamps: {}", invalid_packets_due_timestamps);
+        }
+
         let test_result = TestResult {
             test_parameters: test_parameters,
             packet_results: packet_results,
@@ -124,6 +138,26 @@ impl TestResult {
         average_latency = average_latency / self.packet_results.len() as f64;
 
         return average_latency;
+    }
+
+    pub fn average_latency_client_to_server(&self) -> f64 {
+        let mut average_latency_client_to_server = 0_f64;
+        for packet_result in &self.packet_results {
+            average_latency_client_to_server += packet_result.latency_client_to_server;
+        }
+        average_latency_client_to_server = average_latency_client_to_server / self.packet_results.len() as f64;
+
+        return average_latency_client_to_server;
+    }
+
+    pub fn average_latency_server_to_client(&self) -> f64 {
+        let mut average_latency_server_to_client = 0_f64;
+        for packet_result in &self.packet_results {
+            average_latency_server_to_client += packet_result.latency_server_to_client;
+        }
+        average_latency_server_to_client = average_latency_server_to_client / self.packet_results.len() as f64;
+
+        return average_latency_server_to_client;
     }
 
 }
