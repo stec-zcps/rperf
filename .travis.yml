@@ -1,7 +1,11 @@
 language: rust
 rust:
   - stable
+services:
+  - docker
 
 script:
   - cargo build --verbose --workspace
   - docker build -t stecipa/rperf:1.0.0-SNAPSHOT .
+  - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  - docker push stecipa/rperf:1.0.0-SNAPSHOT

@@ -23,7 +23,6 @@ mod server_tcp;
 mod messages;
 mod packet;
 
-
 use clap::{App, Arg};
 use std::time::Duration;
 
