@@ -1,4 +1,5 @@
 [![Build Status](https://app.travis-ci.com/stec-zcps/rperf.svg?branch=main)](https://app.travis-ci.com/github/stec-zcps/rperf)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fstec-zcps%2Frperf.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fstec-zcps%2Frperf?ref=badge_shield)
 
 # Introduction
 Rperf is a network latency measurement tool written in Rust. It aims to analyze the network latency of packets with 
@@ -54,3 +55,7 @@ rperf client --ip 127.0.0.1 -p 5555 --time 2 --mps 1000 --size 64 --protocol udp
 ```
 
 
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fstec-zcps%2Frperf.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fstec-zcps%2Frperf?ref=badge_large)
