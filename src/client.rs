@@ -28,7 +28,7 @@ pub mod client {
     use crate::test_parameters::TestParameters;
 
     use std::fs::File;
-    use std::io::{Write, Read};
+    use std::io::{Write, Read, ErrorKind};
     use crate::test_result::TestResult;
     use std::str::from_utf8;
     use thread_priority::*;
@@ -70,17 +70,24 @@ pub mod client {
             }
         }
 
-        pub async fn run_test(&mut self){
+        pub async fn run_test(&mut self) -> std::io::Result<TestResult> {
             match &self.test_parameters.protocol.as_ref() {
                 &"udp" => {
-                    &self.run_udp_test().await.unwrap_or_else(|error| {
+                    let test_result = self.run_udp_test().await.unwrap_or_else(|error| {
                        panic!("Problem starting test: {:?}", error);
                     });
+                    Ok(test_result)
                 },
                 &"tcp" => {
-                    &self.run_tcp_test();
+                    let test_result = self.run_tcp_test().unwrap_or_else(|error| {
+                        panic!("Problem starting test: {:?}", error);
+                    });
+                    Ok(test_result)
                 },
-                _ => println!("Unknown protocol"),
+                _ => {
+                    println!("Unsupported protocol '' ");
+                    Err(std::io::Error::new(ErrorKind::Unsupported, format!{"Unsupported protocol '{}'", self.test_parameters.protocol}))
+                },
             }
         }
 
@@ -123,7 +130,7 @@ pub mod client {
             return received_packet;
         }
 
-        async fn run_udp_test(&mut self) -> std::io::Result<()> {
+        async fn run_udp_test(&mut self) -> std::io::Result<TestResult> {
             let sender_socket = UdpSocket::bind("0.0.0.0:0")?;
             //let sender_socket = socket.clone();
             //socket.set_read_timeout(Some(time::Duration::from_secs(3)));
@@ -224,12 +231,12 @@ pub mod client {
             self.sent_packets = thread_send.join().unwrap().unwrap();
             self.received_packets = thread_receive.join().unwrap().unwrap();
 
-            self.generate_result()?;
+            let test_result = self.generate_result()?;
 
-            return Ok(());
+            return Ok(test_result);
         }
 
-        pub fn run_tcp_test(&mut self) -> std::io::Result<()> {
+        pub fn run_tcp_test(&mut self) -> std::io::Result<TestResult> {
             match TcpStream::connect(&self.server_address.clone()) {
                 Ok(mut stream) => {
                     // Send init message and wait for response
@@ -329,20 +336,19 @@ pub mod client {
                     self.sent_packets = thread_send.join().unwrap();
                     self.received_packets = thread_receive.join().unwrap().unwrap();
 
-                    self.generate_result()?;
+                    let test_result = self.generate_result()?;
                     println!("Terminated.");
 
-                    return Ok(());
+                    return Ok(test_result);
                 },
                 Err(e) => {
                     println!("Failed to connect: {}", e);
+                    return Err(e);
                 }
             }
-
-            return Ok(());
         }
 
-        fn generate_result(&mut self) -> std::io::Result<()> {
+        fn generate_result(&mut self) -> std::io::Result<TestResult> {
             let test_result = TestResult::from_tx_rx_times(self.test_parameters.clone(), &self.sent_packets, &self.received_packets, self.test_parameters.output_rtt);
 
             println!("Sent Duration: {:.3} ms", test_result.sent_duration_millis);
@@ -385,7 +391,7 @@ pub mod client {
                 else {
                     csv_writer.write_record(&["Packet", "TxTime[s]", "RxTime[s]", "Latency[ms]", "OneWayLatency_ClientToServer[ms]", "OneWayLatency_ServerToClient[ms]"])?;
                 }
-                for packet_result in test_result.packet_results {
+                for packet_result in test_result.packet_results.clone() {
                     csv_writer.write_record(&[packet_result.index.to_string(),
                         format!("{:.20}", packet_result.tx_time),
                         format!("{:.20}", packet_result.rx_time),
@@ -400,7 +406,7 @@ pub mod client {
 
             println!("Test finished");
 
-            Ok(())
+            Ok(test_result)
         }
     }
 }

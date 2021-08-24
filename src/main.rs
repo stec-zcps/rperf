@@ -14,19 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 </copyright>*/
 
-mod client;
-mod server_udp;
-mod test_parameters;
-mod packet_result;
-mod test_result;
-mod server_tcp;
-mod messages;
-mod packet;
-
 use clap::{App, Arg};
 use std::time::Duration;
 
-use crate::client::client::Client;
 use thread_priority::{set_current_thread_priority, ThreadPriority};
 use affinity::get_core_num;
 use std::process;
@@ -137,18 +127,13 @@ async fn main() {
         let port = matches.value_of_t("port").unwrap();
         let symmetric_network_load = matches.is_present("sym-load");
 
-        match protocol {
-            "udp" => {
-                server_udp::server::start(port, symmetric_network_load).unwrap_or_else(|error| {
-                    panic!("Problem running test: {:?}", error);
-                });
-            },
-            "tcp" => {
-                server_tcp::server::start(port, symmetric_network_load).await.unwrap_or_else(|error| {
-                    panic!("Problem running test: {:?}", error);
-                });
-            },
-            _ => println!("Unknown protocol"),
+        match rperf::start_server(port, protocol, symmetric_network_load).await {
+            Ok(_) => {
+                println!("Server successfully started")
+            }
+            Err(e) => {
+                eprintln!("Server start failed: {}", e)
+            }
         }
     }
     else if let Some(ref matches) = matches.subcommand_matches("client") {
@@ -175,7 +160,13 @@ async fn main() {
             process::exit(1);
         }
 
-        let mut client = Client::new(ip, port, protocol, Duration::from_secs(time), mps, size, log_path, output_rtt, measure_owl);
-        client.run_test().await;
+        match rperf::start_test(ip, port, protocol, Duration::from_secs(time), mps, size, log_path, output_rtt, measure_owl).await {
+            Ok(_) => {
+                println!("Test successfully")
+            }
+            Err(e) => {
+                eprintln!("Test failed: {}", e)
+            }
+        }
     }
 }
