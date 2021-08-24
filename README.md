@@ -1,3 +1,5 @@
+[![Build Status](https://app.travis-ci.com/stec-zcps/rperf.svg?branch=main)](https://app.travis-ci.com/github/stec-zcps/rperf)
+
 # Introduction
 Rperf is a network latency measurement tool written in Rust. It aims to analyze the network latency of packets with 
 different test parameters (e.g. network protocol, packet size, packet rate). The following features and parameters are 
@@ -26,6 +28,8 @@ docker build -t stecipa/rperf:1.0.0-SNAPSHOT .
 ```
 
 # Use
+Rperf Docker Image is available on [Docker Hub](https://hub.docker.com/repository/docker/stecipa/rperf).
+
 Rperf can be started in server or client mode. Use the following command to display the help text and the available parameters:
 ```bash
 rperf help 
