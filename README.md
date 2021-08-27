@@ -51,7 +51,7 @@ rperf client [FLAGS] [OPTIONS] --ip <IP> --port <Port> --time <time> --mps <time
 ```
 Example:
 ```bash
-rperf client --ip 127.0.0.1 -p 5555 --time 2 --mps 1000 --size 64 --protocol udp --log result.csv --owl --rtt
+rperf client --ip 127.0.0.1 -p 5555 --time 2 --warmup 1 --mps 1000 --size 64 --protocol udp --log result.csv --owl --rtt
 ```
 
 

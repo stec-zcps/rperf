@@ -16,9 +16,6 @@ limitations under the License.
 
 use clap::{App, Arg};
 use std::time::Duration;
-
-use thread_priority::{set_current_thread_priority, ThreadPriority};
-use affinity::get_core_num;
 use std::process;
 
 #[tokio::main]
@@ -101,6 +98,12 @@ async fn main() {
                 .about("Path to log test results")
                 .required(false)
                 .takes_value(true))
+            .arg(Arg::new("warmup")
+                .long("warmup")
+                .value_name("Warmup")
+                .about("Warm-up time before test")
+                .required(false)
+                .takes_value(true))
             .arg(Arg::new("rtt")
                 .long("rtt")
                 .value_name("rtt")
@@ -115,10 +118,6 @@ async fn main() {
                 .takes_value(false))
         )
         .get_matches();
-
-    let _cores: Vec<usize> = (0..get_core_num()).collect();
-    println!("Core nums : {}", get_core_num());
-    assert!(set_current_thread_priority(ThreadPriority::Max).is_ok());
 
     if let Some(ref matches) = matches.subcommand_matches("server") {
         println!("Server Mode");
@@ -146,6 +145,11 @@ async fn main() {
         let mps = matches.value_of_t("mps").unwrap();
         let size = matches.value_of_t("size").unwrap();
         let log_path = matches.value_of("log").unwrap_or_default();
+        let mut warmup_time = 0;
+        if matches.is_present("warmup") {
+            warmup_time = matches.value_of_t("warmup").unwrap();
+        }
+
 
         let output_rtt = matches.is_present("rtt");
         let measure_owl = matches.is_present("owl");
@@ -160,7 +164,17 @@ async fn main() {
             process::exit(1);
         }
 
-        match rperf::start_test(ip, port, protocol, Duration::from_secs(time), mps, size, log_path, output_rtt, measure_owl).await {
+        match rperf::start_test(
+            ip,
+            port,
+            protocol,
+            Duration::from_secs(time),
+            mps,
+            size,
+            Duration::from_secs(warmup_time),
+            log_path,
+            output_rtt,
+            measure_owl).await {
             Ok(_) => {
                 println!("Test successfully")
             }

@@ -17,26 +17,19 @@ limitations under the License.
 pub mod client {
     use std::net::{TcpStream, UdpSocket};
     use std::{io, str, thread, process, time};
-
     use std::time::{Instant, SystemTime, Duration, UNIX_EPOCH};
-
-
     use std::sync::{Arc};
+    use std::ops::Add;
+    use std::fs::File;
+    use std::io::{Write, Read, ErrorKind};
+    use std::str::from_utf8;
 
     use csv::Writer;
 
-    use crate::test_parameters::TestParameters;
-
-    use std::fs::File;
-    use std::io::{Write, Read, ErrorKind};
-    use crate::test_result::TestResult;
-    use std::str::from_utf8;
-    use thread_priority::*;
     use crate::messages::InitMessage;
-
-
+    use crate::test_result::TestResult;
     use crate::packet::{SentPacket, ReceivedPacket};
-
+    use crate::test_parameters::TestParameters;
 
     pub struct Client {
         pub test_parameters: TestParameters,
@@ -44,18 +37,30 @@ pub mod client {
         sent_packets: Vec<SentPacket>,
         received_packets: Vec<ReceivedPacket>,
         message_interval: f64,
-        expected_packet_count: u64,
+        expected_packet_count_warmup: u64,
+        expected_packet_count_total: u64,
         log_path: String
     }
 
     impl Client {
-        pub fn new(server_ip: &str, server_port: u16, protocol: &str, test_duration: Duration, packets_per_second: u32, packet_size: usize, log_path: &str, output_rtt: bool, measure_owl: bool) -> Client {
+        pub fn new(server_ip: &str, server_port: u16, protocol: &str, test_duration: Duration, packets_per_second: u32, packet_size: usize, warmup_duration: Duration, log_path: &str, output_rtt: bool, measure_owl: bool) -> Client {
+            if warmup_duration.as_secs() > 0
+            {
+                println!("Warmup Time [s]: {}", warmup_duration.as_secs());
+            }
+            else {
+                println!("No warmup");
+            }
+            let expected_packet_count_warmup = warmup_duration.as_millis() as u64 / 1000_u64 * packets_per_second.clone() as u64;
+            let expected_packet_count_valid = test_duration.as_millis() as u64 / 1000_u64 * packets_per_second.clone() as u64;
             Client {
                 test_parameters: TestParameters {
                     server_ip: server_ip.to_string(),
                     server_port: server_port.clone(),
                     protocol: protocol.to_string(),
-                    time: test_duration,
+                    test_duration_valid: test_duration,
+                    test_duration_total: test_duration.add(warmup_duration),
+                    warmup_duration,
                     packets_per_second,
                     packet_size,
                     output_rtt,
@@ -65,7 +70,8 @@ pub mod client {
                 sent_packets: Vec::new(),
                 received_packets: Vec::new(),
                 message_interval: 1_f64 / packets_per_second.clone() as f64 * 1000_000_f64,
-                expected_packet_count: test_duration.as_millis() as u64 / 1000_u64 * packets_per_second.clone() as u64,
+                expected_packet_count_warmup,
+                expected_packet_count_total: expected_packet_count_warmup + expected_packet_count_valid,
                 log_path: String::from(log_path)
             }
         }
@@ -102,8 +108,9 @@ pub mod client {
 
             let sent_packet = SentPacket {
                 index: *packet_index,
-                sent_duration: sent_duration,
-                sent_timestamp: current_system_time_unix_epoch
+                sent_duration,
+                sent_timestamp: current_system_time_unix_epoch,
+                is_warmup: false
             };
 
             return (sent_packet, payload);
@@ -122,9 +129,9 @@ pub mod client {
 
             let received_packet = ReceivedPacket {
                 index: received_packet_index,
-                received_duration: received_duration,
+                received_duration,
                 received_timestamp: receive_timestamp_unix_epoch,
-                server_timestamp: server_timestamp_unix_epoch
+                server_timestamp: server_timestamp_unix_epoch,
             };
 
             return received_packet;
@@ -132,8 +139,7 @@ pub mod client {
 
         async fn run_udp_test(&mut self) -> std::io::Result<TestResult> {
             let sender_socket = UdpSocket::bind("0.0.0.0:0")?;
-            //let sender_socket = socket.clone();
-            //socket.set_read_timeout(Some(time::Duration::from_secs(3)));
+            sender_socket.set_read_timeout(Some(time::Duration::from_secs(3))).unwrap();
             sender_socket.connect(&self.server_address.clone())?;
             sender_socket.send("_client_".as_bytes())?;
             let receiver_socket = sender_socket.try_clone().unwrap();
@@ -159,15 +165,11 @@ pub mod client {
             let _timer = howlong::HighResolutionTimer::new();
 
             println!("Starting test against server '{}'", &self.server_address);
-            let expected_packet_count = self.expected_packet_count;
+            let expected_packet_count = self.expected_packet_count_total;
+            let max_warmup_packet_index = self.expected_packet_count_warmup;
             let packet_size = self.test_parameters.packet_size;
             let message_interval = self.message_interval;
             let thread_send = thread::spawn(move || -> std::io::Result<Vec<SentPacket>> {
-
-                // let core_ids = core_affinity::get_core_ids().unwrap();
-                // core_affinity::set_for_current(core_ids[5]);
-                assert!(set_current_thread_priority(ThreadPriority::Max).is_ok());
-
                 let mut sent_packets: Vec<SentPacket> = Vec::with_capacity((expected_packet_count + 10) as usize);
                 let mut packet_index = 0_u64;
                 let mut last_sent_time = SystemTime::now();
@@ -185,27 +187,23 @@ pub mod client {
                     last_sent_time = SystemTime::now();
                 }
 
+                if max_warmup_packet_index > 0
+                {
+                    for sent_packet in &mut sent_packets {
+                        if sent_packet.index < max_warmup_packet_index {
+                            sent_packet.is_warmup = true;
+                        }
+                    }
+                }
+
                 Ok(sent_packets)
             });
 
-            let test_duration = self.test_parameters.time;
+            let test_duration = self.test_parameters.test_duration_total;
             let thread_receive = thread::spawn(move || -> std::io::Result<Vec<ReceivedPacket>> {
-                // Configure thread
-                // let core_ids = core_affinity::get_core_ids().unwrap();
-                // core_affinity::set_for_current(core_ids[5]);
-                assert!(set_current_thread_priority(ThreadPriority::Max).is_ok());
-
-                // Configure socket
-                //socket_clone.set_read_timeout(Some(time::Duration::from_secs(1)));
-
                 let mut received_packets: Vec<ReceivedPacket> = Vec::with_capacity((expected_packet_count + 10) as usize);
 
-                // Open UDP socket
-                //let server_address = format!("{}:{}", "0.0.0.0", 5556);
-                //let receiver_socket = UdpSocket::bind(server_address).unwrap();
                 receiver_socket.set_read_timeout(Some(time::Duration::from_secs(3)))?;
-                //println!("Started UDP server on port '{}'", 5556);
-
                 'outer: while instant_receiver_thread.elapsed() < test_duration + time::Duration::from_millis(1000) {
                     let mut buf = [0u8; 1500];
 
@@ -222,8 +220,6 @@ pub mod client {
                     let received_packet = Client::generate_received_packet(buf.to_vec(), instant_receiver_thread.elapsed());
                     received_packets.push(received_packet);
                 }
-
-                println!("Receive thread finished");
 
                 Ok(received_packets)
             });
@@ -272,12 +268,11 @@ pub mod client {
                     let instant_sender_thread = Arc::new(Instant::now());
                     let instant_receiver_thread = instant_sender_thread.clone();
 
-                    let expected_packet_count = self.expected_packet_count;
+                    let expected_packet_count = self.expected_packet_count_total;
+                    let max_warmup_packet_index = self.expected_packet_count_warmup;
                     let packet_size = self.test_parameters.packet_size;
                     let message_interval = self.message_interval;
                     let thread_send = thread::spawn(move || {
-                        // Configure thread
-                        assert!(set_current_thread_priority(ThreadPriority::Max).is_ok());
                         // Configure stream
                         stream.set_nodelay(true).unwrap();
 
@@ -299,13 +294,20 @@ pub mod client {
                             last_sent_time = SystemTime::now();
                         }
 
+                        if max_warmup_packet_index > 0
+                        {
+                            for sent_packet in &mut sent_packets {
+                                if sent_packet.index < max_warmup_packet_index {
+                                    sent_packet.is_warmup = true;
+                                }
+                            }
+                        }
+
                         sent_packets
                     });
 
-                    let test_duration = self.test_parameters.time;
+                    let test_duration = self.test_parameters.test_duration_total;
                     let thread_receive = thread::spawn(move || -> Result<Vec<ReceivedPacket>, std::io::Error> {
-                        // Configure thread
-                        assert!(set_current_thread_priority(ThreadPriority::Max).is_ok());
                         // Configure stream
                         stream_clone.set_read_timeout(Some(time::Duration::from_secs(10)))?;
 
@@ -327,10 +329,7 @@ pub mod client {
                             }
                         }
 
-                        println!("Receive thread finished");
                         return Ok(received_packets);
-
-
                     });
 
                     self.sent_packets = thread_send.join().unwrap();
@@ -374,7 +373,7 @@ pub mod client {
                                     Test Results: Sent Duration [s]: {:.3} | Sent Packets: {}, Received Packets: {}, Lost Packets: {}, Average Latency [ms]: {}\n",
                                        test_result.test_parameters.server_ip,
                                        test_result.test_parameters.server_port,
-                                       test_result.test_parameters.time.as_secs(),
+                                       test_result.test_parameters.test_duration_valid.as_secs(),
                                        test_result.test_parameters.packets_per_second,
                                        test_result.test_parameters.packet_size,
                                        test_result.sent_duration_millis,

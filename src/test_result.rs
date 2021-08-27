@@ -34,9 +34,9 @@ pub struct TestResult {
 impl TestResult {
     pub fn from_tx_rx_times(test_parameters: TestParameters, sent_packets: &Vec<SentPacket>, received_packets: &Vec<ReceivedPacket>, output_rtt: bool) -> TestResult {
 
-        let sent_packet_count = sent_packets.len();
-        let received_packets_count = received_packets.len();
-        let mut lost_packet_count = 0;
+        let mut sent_packet_count = sent_packets.len();
+        let mut lost_packets_count = 0;
+        let mut received_packets_count = 0;
 
         let mut packet_results: LinkedList<PacketResult> = LinkedList::new();
 
@@ -48,7 +48,12 @@ impl TestResult {
 
         let mut invalid_packets_due_timestamps = 0;
         for sent_packet in sent_packets {
-            if receive_packets_map.contains_key(&sent_packet.index)
+            if sent_packet.is_warmup
+            {
+                sent_packet_count -= 1;
+                continue;
+            }
+            else if receive_packets_map.contains_key(&sent_packet.index)
             {
                 let received_packet = *receive_packets_map.get(&sent_packet.index).unwrap();
                 let received_time = received_packet.received_duration;
@@ -101,9 +106,11 @@ impl TestResult {
                     latency_server_to_client: one_way_latency_server_to_client_ms
                 };
                 packet_results.push_back(packet_result);
+
+                received_packets_count += 1;
             }
             else {
-                lost_packet_count += 1;
+                lost_packets_count += 1;
             }
         }
 
@@ -123,8 +130,8 @@ impl TestResult {
             packet_results: packet_results,
             sent_duration_millis: sent_duration,
             sent_packets_count: sent_packet_count as u64,
-            received_packets_count: received_packets_count as u64,
-            lost_packets_count: lost_packet_count
+            received_packets_count,
+            lost_packets_count
         };
 
         return test_result;

@@ -36,9 +36,9 @@ pub async fn start_server(port: u16, protocol: &str, symmetric_network_load: boo
     }
 }
 
-pub async fn start_test(server_ip: &str, server_port: u16, protocol: &str, test_duration: Duration, packets_per_second: u32, packet_size: usize, log_path: &str, output_rtt: bool, measure_owl: bool) -> std::io::Result<TestResult>
+pub async fn start_test(server_ip: &str, server_port: u16, protocol: &str, test_duration: Duration, packets_per_second: u32, packet_size: usize, warmup_duration: Duration, log_path: &str, output_rtt: bool, measure_owl: bool) -> std::io::Result<TestResult>
 {
-    let mut client = Client::new(server_ip, server_port, protocol, test_duration, packets_per_second, packet_size, log_path, output_rtt, measure_owl);
+    let mut client = Client::new(server_ip, server_port, protocol, test_duration, packets_per_second, packet_size, warmup_duration, log_path, output_rtt, measure_owl);
     let test_result = client.run_test().await.unwrap();
 
     Ok(test_result)

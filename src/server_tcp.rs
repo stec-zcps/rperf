@@ -21,7 +21,6 @@ pub mod server {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use crate::messages::InitMessage;
     use std::str::from_utf8;
-    use thread_priority::*;
     use std::time::{SystemTime, UNIX_EPOCH};
     use async_std::{task};
 
@@ -37,10 +36,6 @@ pub mod server {
         }
 
         pub async fn start(&self, port: u16, symmetric_network_load: bool) -> Result<(), Box<dyn std::error::Error>> {
-            // Configure thread
-            // let core_ids = core_affinity::get_core_ids().unwrap();
-            // core_affinity::set_for_current(core_ids[0]);
-            assert!(set_current_thread_priority(ThreadPriority::Max).is_ok());
             // Open TCP socket
             let server_address = format!("{}:{}", "0.0.0.0", port);
             let listener = TcpListener::bind(server_address).await?;
@@ -125,6 +120,7 @@ pub mod server {
             Ok(())
         }
 
+        #[allow(dead_code)]
         pub fn stop(&mut self)
         {
             self.run = false;

@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod server_tests {
+mod integration_tests {
     use std::time::Duration;
     use std::{thread, time};
     use async_std::{task};
@@ -11,7 +11,17 @@ mod server_tests {
             rperf::start_server(7777, "udp", false).await.unwrap();
         });
 
-        let result= rperf::start_test("127.0.0.1", 7777, "udp", Duration::from_secs(1), 1000, 64, "", true, true).await;
+        let result= rperf::start_test(
+            "127.0.0.1",
+            7777,
+            "udp",
+            Duration::from_secs(1),
+            1000,
+            64,
+            Duration::from_secs(1),
+            "",
+            true,
+            true).await;
         assert!(result.is_ok())
     }
 
@@ -24,7 +34,17 @@ mod server_tests {
 
         thread::sleep(time::Duration::from_millis(100));
 
-        let result= rperf::start_test("127.0.0.1", 7778, "tcp", Duration::from_secs(1), 1000, 64, "", true, true).await;
+        let result= rperf::start_test(
+            "127.0.0.1",
+            7778,
+            "tcp",
+            Duration::from_secs(1),
+            1000,
+            64,
+            Duration::from_secs(1),
+            "",
+            true,
+            true).await;
         assert!(result.is_ok())
     }
 
